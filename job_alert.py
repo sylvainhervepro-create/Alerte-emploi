@@ -53,8 +53,10 @@ def fetch_jobs(token):
     for search in searches:
         params = {**common_params, **search}
         r = requests.get(url, headers=headers, params=params)
-        if r.status_code != 200:
+if r.status_code != 200:
+            print(f"❌ Erreur {r.status_code} pour '{search['motsCles']}' : {r.text}")
             continue
+        print(f"✅ '{search['motsCles']}' → {len(data.get('resultats', []))} résultat(s)")
         data = r.json()
         for offre in data.get("resultats", []):
             if offre["id"] in seen_ids:
@@ -121,5 +123,8 @@ def send_email(jobs):
 # ── Main ────────────────────────────────────────────────────────
 if __name__ == "__main__":
     token = get_ft_token()
+    print(f"✅ Token obtenu : {token[:10]}...")  # ← ajouter cette ligne
+    jobs  = fetch_jobs(token)
+    send_email(jobs)
     jobs  = fetch_jobs(token)
     send_email(jobs)
