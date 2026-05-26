@@ -46,6 +46,7 @@ def fetch_jobs(token):
         "departement":    "75,92,93,94,78",
         "minCreationDate": today.strftime("%Y-%m-%dT00:00:00Z"),
         "maxCreationDate": today.strftime("%Y-%m-%dT23:59:59Z"),
+        "salaireMin":     "100000",
         "range":          "0-9",
         "sort":           "1",
     }
@@ -63,6 +64,11 @@ def fetch_jobs(token):
             if offre["id"] in seen_ids:
                 continue
             seen_ids.add(offre["id"])
+            title = offre.get("intitule", "").lower()
+            exclude_titles = ["infirmier", "infirmière", "comptable", "assistant",
+                            "technicien", "commercial", "ingénieur", "développeur"]
+            if any(ex in title for ex in exclude_titles):
+                continue
             jobs.append({
                 "title":    offre.get("intitule", "Sans titre"),
                 "company":  offre.get("entreprise", {}).get("nom", "Entreprise non précisée"),
