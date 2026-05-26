@@ -86,61 +86,24 @@ def fetch_jobs(token):
             })
     return jobs
     
-# ── Récupération des offres Hellowork ───────────────────────────
-def fetch_jobs_hellowork():
-    url = "https://www.hellowork.com/searchoffers/search"
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0",
-    }
+# ── Récupération des offres Welcome to the Jungle ──────────────
+def fetch_jobs_wttj():
+    import feedparser
     searches = [
-        "directeur général",
-        "CEO",
-        "COO",
-        "CFO directeur financier",
-        "directeur marketing digital",
+        "directeur-general",
+        "chief-executive-officer",
+        "directeur-financier",
+        "directeur-operationnel",
     ]
     jobs = []
     seen_ids = set()
     for kw in searches:
-        payload = {
-            "keyword": kw,
-            "location": "Île-de-France",
-            "contract": "CDI",
-            "salary": "100000",
-            "page": 1,
-            "resultsPerPage": 10,
-        }
+        url = f"https://www.welcometothejungle.com/fr/jobs?query={kw}&aroundQuery=Paris&refinementList[contract_type][]=full_time"
         try:
-            r = requests.post(url, headers=headers, json=payload, timeout=10)
-            if r.status_code != 200:
-                print(f"ℹ️ Hellowork {r.status_code} pour '{kw}'")
-                continue
-            data = r.json()
-            for offre in data.get("offers", data.get("results", [])):
-                oid = offre.get("id", offre.get("reference", ""))
-                if oid in seen_ids:
-                    continue
-                seen_ids.add(oid)
-                title = offre.get("title", offre.get("label", "")).lower()
-                include_titles = ["directeur", "director", "ceo", "coo", "cfo",
-                                "daf", "général", "general", "président", "managing"]
-                if not any(inc in title for inc in include_titles):
-                    continue
-                jobs.append({
-                    "title":    offre.get("title", offre.get("label", "Sans titre")),
-                    "company":  offre.get("company", {}).get("name", "?") if isinstance(offre.get("company"), dict) else offre.get("company", "?"),
-                    "location": offre.get("location", offre.get("city", "")),
-                    "contract": "CDI",
-                    "salary":   offre.get("salary", "Non précisé"),
-                    "link":     offre.get("url", offre.get("applyUrl", "#")),
-                    "description": offre.get("description", "")[:300],
-                    "source":   "Hellowork",
-                })
-            print(f"✅ Hellowork '{kw}' → {len(jobs)} offre(s)")
+            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+            print(f"ℹ️ WTTJ '{kw}' → status {r.status_code}")
         except Exception as e:
-            print(f"❌ Hellowork erreur pour '{kw}' : {e}")
+            print(f"❌ WTTJ erreur '{kw}' : {e}")
     return jobs
     
 # ── Email HTML ──────────────────────────────────────────────────
@@ -195,5 +158,5 @@ if __name__ == "__main__":
     token = get_ft_token()
     print(f"✅ Token obtenu : {token[:10]}...")
     jobs  = fetch_jobs(token)
-    jobs += fetch_jobs_hellowork()
+    jobs += fetch_jobs_wttj()
     send_email(jobs)
