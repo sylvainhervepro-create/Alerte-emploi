@@ -126,5 +126,3 @@ if __name__ == "__main__":
     print(f"✅ Token obtenu : {token[:10]}...")
     jobs  = fetch_jobs(token)
     send_email(jobs)
-    jobs  = fetch_jobs(token)
-    send_email(jobs)
