@@ -85,7 +85,64 @@ def fetch_jobs(token):
                 "description": offre.get("description", "")[:300],
             })
     return jobs
-
+    
+# ── Récupération des offres Hellowork ───────────────────────────
+def fetch_jobs_hellowork():
+    url = "https://www.hellowork.com/searchoffers/search"
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0",
+    }
+    searches = [
+        "directeur général",
+        "CEO",
+        "COO",
+        "CFO directeur financier",
+        "directeur marketing digital",
+    ]
+    jobs = []
+    seen_ids = set()
+    for kw in searches:
+        payload = {
+            "keyword": kw,
+            "location": "Île-de-France",
+            "contract": "CDI",
+            "salary": "100000",
+            "page": 1,
+            "resultsPerPage": 10,
+        }
+        try:
+            r = requests.post(url, headers=headers, json=payload, timeout=10)
+            if r.status_code != 200:
+                print(f"ℹ️ Hellowork {r.status_code} pour '{kw}'")
+                continue
+            data = r.json()
+            for offre in data.get("offers", data.get("results", [])):
+                oid = offre.get("id", offre.get("reference", ""))
+                if oid in seen_ids:
+                    continue
+                seen_ids.add(oid)
+                title = offre.get("title", offre.get("label", "")).lower()
+                include_titles = ["directeur", "director", "ceo", "coo", "cfo",
+                                "daf", "général", "general", "président", "managing"]
+                if not any(inc in title for inc in include_titles):
+                    continue
+                jobs.append({
+                    "title":    offre.get("title", offre.get("label", "Sans titre")),
+                    "company":  offre.get("company", {}).get("name", "?") if isinstance(offre.get("company"), dict) else offre.get("company", "?"),
+                    "location": offre.get("location", offre.get("city", "")),
+                    "contract": "CDI",
+                    "salary":   offre.get("salary", "Non précisé"),
+                    "link":     offre.get("url", offre.get("applyUrl", "#")),
+                    "description": offre.get("description", "")[:300],
+                    "source":   "Hellowork",
+                })
+            print(f"✅ Hellowork '{kw}' → {len(jobs)} offre(s)")
+        except Exception as e:
+            print(f"❌ Hellowork erreur pour '{kw}' : {e}")
+    return jobs
+    
 # ── Email HTML ──────────────────────────────────────────────────
 def build_html(jobs):
     date_str = datetime.now().strftime("%A %d %B %Y")
@@ -95,7 +152,8 @@ def build_html(jobs):
         <div style="border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:16px;">
           <h3 style="margin:0 0 4px;color:#1a1a2e;">{j['title']}</h3>
           <p style="margin:0 0 4px;color:#555;font-size:13px;">
-            <strong>{j['company']}</strong> &nbsp;|&nbsp; 📍 {j['location']}
+            <strong>{j['company']}</strong> &nbsp;|&nbsp; 📍 {j['location']} &nbsp;|&nbsp; <em>{j.get('source','France Travail')}</em>
+          </p>
           </p>
           <p style="margin:0 0 8px;color:#888;font-size:12px;">
             {j['contract']} &nbsp;·&nbsp; 💶 {j['salary']}
@@ -137,4 +195,5 @@ if __name__ == "__main__":
     token = get_ft_token()
     print(f"✅ Token obtenu : {token[:10]}...")
     jobs  = fetch_jobs(token)
+    jobs += fetch_jobs_hellowork()
     send_email(jobs)
