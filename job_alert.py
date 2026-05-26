@@ -53,23 +53,23 @@ def fetch_jobs(token):
     for search in searches:
         params = {**common_params, **search}
         r = requests.get(url, headers=headers, params=params)
-if r.status_code != 200:
+        if r.status_code != 200:
             print(f"❌ Erreur {r.status_code} pour '{search['motsCles']}' : {r.text}")
             continue
-        print(f"✅ '{search['motsCles']}' → {len(data.get('resultats', []))} résultat(s)")
         data = r.json()
+        print(f"✅ '{search['motsCles']}' → {len(data.get('resultats', []))} résultat(s)")
         for offre in data.get("resultats", []):
             if offre["id"] in seen_ids:
                 continue
             seen_ids.add(offre["id"])
             jobs.append({
-                "title":   offre.get("intitule", "Sans titre"),
-                "company": offre.get("entreprise", {}).get("nom", "Entreprise non précisée"),
-                "location":offre.get("lieuTravail", {}).get("libelle", ""),
-                "contract":offre.get("typeContratLibelle", ""),
-                "salary":  offre.get("salaire", {}).get("libelle", "Non précisé"),
-                "link":    offre.get("origineOffre", {}).get("urlOrigine",
-                           f"https://candidat.francetravail.fr/offres/recherche/detail/{offre['id']}"),
+                "title":    offre.get("intitule", "Sans titre"),
+                "company":  offre.get("entreprise", {}).get("nom", "Entreprise non précisée"),
+                "location": offre.get("lieuTravail", {}).get("libelle", ""),
+                "contract": offre.get("typeContratLibelle", ""),
+                "salary":   offre.get("salaire", {}).get("libelle", "Non précisé"),
+                "link":     offre.get("origineOffre", {}).get("urlOrigine",
+                            f"https://candidat.francetravail.fr/offres/recherche/detail/{offre['id']}"),
                 "description": offre.get("description", "")[:300],
             })
     return jobs
