@@ -41,13 +41,14 @@ def fetch_jobs(token):
         {"motsCles": "CFO directeur financier",    "typeContrat": "CDI"},
         {"motsCles": "directeur marketing digital","typeContrat": "CDI"},
     ]
+    today = datetime.now()
     common_params = {
-        "departement": "75,92,93,94,78",  # Paris + petite couronne + Yvelines
-        "minCreationDate": datetime.now().strftime("%Y-%m-%dT00:00:00Z"),
+        "departement":    "75,92,93,94,78",
+        "minCreationDate": today.strftime("%Y-%m-%dT00:00:00Z"),
+        "maxCreationDate": today.strftime("%Y-%m-%dT23:59:59Z"),
         "range":          "0-9",
-        "sort":           "1",  # tri par date
+        "sort":           "1",
     }
-
     jobs = []
     seen_ids = set()
     for search in searches:
