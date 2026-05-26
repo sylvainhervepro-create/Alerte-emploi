@@ -88,20 +88,51 @@ def fetch_jobs(token):
     
 # ── Récupération des offres Welcome to the Jungle ──────────────
 def fetch_jobs_wttj():
-    import feedparser
+    import json, re
     searches = [
-        "directeur-general",
-        "chief-executive-officer",
-        "directeur-financier",
-        "directeur-operationnel",
+        "directeur général",
+        "CEO",
+        "directeur financier CFO",
+        "directeur opérationnel COO",
     ]
     jobs = []
     seen_ids = set()
     for kw in searches:
-        url = f"https://www.welcometothejungle.com/fr/jobs?query={kw}&aroundQuery=Paris&refinementList[contract_type][]=full_time"
+        url = f"https://www.welcometothejungle.com/fr/jobs?query={requests.utils.quote(kw)}&aroundQuery=Paris%2C%20France&refinementList[contract_type][]=full_time"
         try:
             r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-            print(f"ℹ️ WTTJ '{kw}' → status {r.status_code}")
+            # Chercher les données JSON embarquées dans la page
+            match = re.search(r'window\.__REDACTED__\s*=\s*(\{.*?\});', r.text)
+            if not match:
+                match = re.search(r'"hits"\s*:\s*(\[.*?\])\s*,\s*"nbHits"', r.text, re.DOTALL)
+            if match:
+                hits = json.loads(match.group(1))
+                if isinstance(hits, list):
+                    for h in hits[:5]:
+                        oid = h.get("objectID", h.get("id", ""))
+                        if oid in seen_ids:
+                            continue
+                        seen_ids.add(oid)
+                        title = h.get("name", h.get("title", "")).lower()
+                        include_titles = ["directeur", "director", "ceo", "coo",
+                                        "cfo", "daf", "général", "président", "managing"]
+                        if not any(inc in title for inc in include_titles):
+                            continue
+                        slug = h.get("slug", oid)
+                        company_slug = h.get("organization", {}).get("slug", "")
+                        jobs.append({
+                            "title":    h.get("name", h.get("title", "Sans titre")),
+                            "company":  h.get("organization", {}).get("name", "?"),
+                            "location": h.get("city", "Paris"),
+                            "contract": "CDI",
+                            "salary":   "Non précisé",
+                            "link":     f"https://www.welcometothejungle.com/fr/companies/{company_slug}/jobs/{slug}",
+                            "description": h.get("description", "")[:300],
+                            "source":   "Welcome to the Jungle",
+                        })
+                print(f"✅ WTTJ '{kw}' → {len(jobs)} offre(s)")
+            else:
+                print(f"ℹ️ WTTJ '{kw}' → pas de données JSON trouvées")
         except Exception as e:
             print(f"❌ WTTJ erreur '{kw}' : {e}")
     return jobs
