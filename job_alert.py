@@ -1,64 +1,75 @@
-import feedparser
 import smtplib
 import os
+import requests
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from datetime import datetime, timedelta
-from urllib.parse import quote
+from datetime import datetime
 
 # ── Configuration ──────────────────────────────────────────────
-GMAIL_USER     = os.environ["GMAIL_USER"]
-GMAIL_PASSWORD = os.environ["GMAIL_PASSWORD"]
-RECIPIENT      = "sylvainhervepro@gmail.com"
+GMAIL_USER      = os.environ["GMAIL_USER"]
+GMAIL_PASSWORD  = os.environ["GMAIL_PASSWORD"]
+FT_CLIENT_ID    = os.environ["FT_CLIENT_ID"]
+FT_CLIENT_SECRET= os.environ["FT_CLIENT_SECRET"]
+RECIPIENT       = "sylvainhervepro@gmail.com"
 
-KEYWORDS = [
-    "directeur général", "directeur general",
-    "CEO", "COO", "CFO", "DAF",
-    "directeur administratif", "directeur financier",
-    "directeur marketing digital", "DG",
-]
+# ── Authentification France Travail ─────────────────────────────
+def get_ft_token():
+    url = "https://entreprise.francetravail.fr/connexion/oauth2/access_token"
+    params = {"realm": "/partenaire"}
+    data = {
+        "grant_type":    "client_credentials",
+        "client_id":     FT_CLIENT_ID,
+        "client_secret": FT_CLIENT_SECRET,
+        "scope":         "api_offresdemploiv2 o2dsoffre",
+    }
+    r = requests.post(url, params=params, data=data)
+    r.raise_for_status()
+    return r.json()["access_token"]
 
-EXCLUDE = ["stage", "alternance", "apprentissage", "stagiaire"]
-
-# ── Sources RSS ─────────────────────────────────────────────────
-def build_feeds():
-    base_kw = quote("directeur général OR CEO OR COO OR CFO Paris")
-    return [
-        # Indeed
-        f"https://fr.indeed.com/rss?q=directeur+g%C3%A9n%C3%A9ral+CEO+COO+CFO&l=Paris&sort=date",
-        # Cadremploi
-        "https://www.cadremploi.fr/rss/offres?motsCles=directeur+general+CEO+COO+CFO&lieuCode=75&lieuLabel=Paris",
-        # LinkedIn (flux RSS public par recherche)
-        "https://www.linkedin.com/jobs/search/?keywords=directeur+g%C3%A9n%C3%A9ral+CEO+COO&location=Paris&f_TPR=r86400&format=rss",
+# ── Récupération des offres ─────────────────────────────────────
+def fetch_jobs(token):
+    url = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept":        "application/json",
+    }
+    # Recherches multiples pour couvrir votre profil
+    searches = [
+        {"motsCles": "directeur général",         "typeContrat": "CDI"},
+        {"motsCles": "CEO",                        "typeContrat": "CDI"},
+        {"motsCles": "COO directeur opérations",   "typeContrat": "CDI"},
+        {"motsCles": "CFO directeur financier",    "typeContrat": "CDI"},
+        {"motsCles": "directeur marketing digital","typeContrat": "CDI"},
     ]
+    common_params = {
+        "departement":    "75,77,78,91,92,93,94,95",  # Paris + IDF
+        "minCreationDate": datetime.now().strftime("%Y-%m-%dT00:00:00Z"),
+        "range":          "0-9",
+        "sort":           "1",  # tri par date
+    }
 
-# ── Filtrage ────────────────────────────────────────────────────
-def is_relevant(entry):
-    text = (entry.get("title","") + " " + entry.get("summary","")).lower()
-    has_keyword = any(kw.lower() in text for kw in KEYWORDS)
-    has_exclude = any(ex.lower() in text for ex in EXCLUDE)
-    return has_keyword and not has_exclude
-
-def fetch_jobs():
     jobs = []
-    yesterday = datetime.now() - timedelta(days=1)
-    for url in build_feeds():
-        feed = feedparser.parse(url)
-        for entry in feed.entries:
-            # Filtre date (< 24h)
-            published = entry.get("published_parsed")
-            if published:
-                pub_date = datetime(*published[:6])
-                if pub_date < yesterday:
-                    continue
-            if is_relevant(entry):
-                jobs.append({
-                    "title":   entry.get("title", "Sans titre"),
-                    "company": entry.get("author", entry.get("source", {}).get("title", "?")),
-                    "link":    entry.get("link", "#"),
-                    "summary": entry.get("summary", "")[:300],
-                    "source":  feed.feed.get("title", "Job Board"),
-                })
+    seen_ids = set()
+    for search in searches:
+        params = {**common_params, **search}
+        r = requests.get(url, headers=headers, params=params)
+        if r.status_code != 200:
+            continue
+        data = r.json()
+        for offre in data.get("resultats", []):
+            if offre["id"] in seen_ids:
+                continue
+            seen_ids.add(offre["id"])
+            jobs.append({
+                "title":   offre.get("intitule", "Sans titre"),
+                "company": offre.get("entreprise", {}).get("nom", "Entreprise non précisée"),
+                "location":offre.get("lieuTravail", {}).get("libelle", ""),
+                "contract":offre.get("typeContratLibelle", ""),
+                "salary":  offre.get("salaire", {}).get("libelle", "Non précisé"),
+                "link":    offre.get("origineOffre", {}).get("urlOrigine",
+                           f"https://candidat.francetravail.fr/offres/recherche/detail/{offre['id']}"),
+                "description": offre.get("description", "")[:300],
+            })
     return jobs
 
 # ── Email HTML ──────────────────────────────────────────────────
@@ -69,10 +80,13 @@ def build_html(jobs):
         cards += f"""
         <div style="border:1px solid #e0e0e0;border-radius:8px;padding:16px;margin-bottom:16px;">
           <h3 style="margin:0 0 4px;color:#1a1a2e;">{j['title']}</h3>
-          <p style="margin:0 0 8px;color:#555;font-size:13px;">
-            {j['company']} &nbsp;|&nbsp; <em>{j['source']}</em>
+          <p style="margin:0 0 4px;color:#555;font-size:13px;">
+            <strong>{j['company']}</strong> &nbsp;|&nbsp; 📍 {j['location']}
           </p>
-          <p style="margin:0 0 12px;font-size:13px;color:#333;">{j['summary']}…</p>
+          <p style="margin:0 0 8px;color:#888;font-size:12px;">
+            {j['contract']} &nbsp;·&nbsp; 💶 {j['salary']}
+          </p>
+          <p style="margin:0 0 12px;font-size:13px;color:#333;">{j['description']}…</p>
           <a href="{j['link']}" style="background:#2e7d32;color:white;padding:8px 16px;
              border-radius:4px;text-decoration:none;font-size:13px;">Voir l'offre →</a>
         </div>"""
@@ -88,7 +102,7 @@ def build_html(jobs):
       <p><strong>{len(jobs)} offre(s) trouvée(s)</strong></p>
       {cards}
       <hr style="border:none;border-top:1px solid #eee;margin-top:32px;">
-      <p style="font-size:11px;color:#aaa;">Généré automatiquement · job-alert</p>
+      <p style="font-size:11px;color:#aaa;">Généré automatiquement · job-alert · France Travail API</p>
     </body></html>"""
 
 # ── Envoi email ─────────────────────────────────────────────────
@@ -106,5 +120,6 @@ def send_email(jobs):
 
 # ── Main ────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    jobs = fetch_jobs()
+    token = get_ft_token()
+    jobs  = fetch_jobs(token)
     send_email(jobs)
