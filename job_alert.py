@@ -42,7 +42,7 @@ def fetch_jobs(token):
         {"motsCles": "directeur marketing digital","typeContrat": "CDI"},
     ]
     common_params = {
-        "departement":    "75,77,78,91,92,93,94,95",  # Paris + IDF
+        "departement": "75,92,93,94,78",  # Paris + petite couronne + Yvelines
         "minCreationDate": datetime.now().strftime("%Y-%m-%dT00:00:00Z"),
         "range":          "0-9",
         "sort":           "1",  # tri par date
