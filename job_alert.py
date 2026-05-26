@@ -65,8 +65,13 @@ def fetch_jobs(token):
                 continue
             seen_ids.add(offre["id"])
             title = offre.get("intitule", "").lower()
-            exclude_titles = ["infirmier", "infirmière", "comptable", "assistant",
-                            "technicien", "commercial", "ingénieur", "développeur"]
+            exclude_titles = ["infirmier", "infirmiere", "infirmière", "infirmièr",
+                            "comptable", "assistant", "technicien", "commercial", 
+                            "ingénieur", "développeur", "aide-soignant", "médecin"]
+            include_titles = ["directeur", "director", "ceo", "coo", "cfo", "daf",
+                            "général", "general", "président", "managing"]
+            if not any(inc in title for inc in include_titles):
+                continue
             if any(ex in title for ex in exclude_titles):
                 continue
             jobs.append({
