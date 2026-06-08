@@ -90,6 +90,49 @@ def fetch_jobs(token):
 # ── Welcome to the Jungle : alerte email native recommandée ────
 def fetch_jobs_wttj():
     return []
+
+# ── Récupération des offres Indeed via RSS ──────────────────────
+def fetch_jobs_indeed():
+    import feedparser
+    searches = [
+        "directeur+général",
+        "CEO+directeur",
+        "COO+directeur+opérations",
+        "CFO+directeur+financier",
+        "directeur+filiale+PME",
+    ]
+    jobs = []
+    seen_ids = set()
+    for kw in searches:
+        url = f"https://fr.indeed.com/rss?q={kw}&l=Île-de-France&sc=0kf%3Aattr%28DSQF7%29%3B&sort=date"
+        try:
+            feed = feedparser.parse(url)
+            print(f"ℹ️ Indeed '{kw}' → {len(feed.entries)} entrée(s)")
+            for entry in feed.entries:
+                oid = entry.get("id", entry.get("link", ""))
+                if oid in seen_ids:
+                    continue
+                seen_ids.add(oid)
+                title = entry.get("title", "").lower()
+                include_titles = ["directeur", "director", "ceo", "coo", "cfo",
+                                "daf", "général", "general", "président", "managing",
+                                "gérant", "filiale"]
+                if not any(inc in title for inc in include_titles):
+                    continue
+                jobs.append({
+                    "title":       entry.get("title", "Sans titre"),
+                    "company":     entry.get("author", "?"),
+                    "location":    "Île-de-France",
+                    "contract":    "CDI",
+                    "salary":      "Non précisé",
+                    "link":        entry.get("link", "#"),
+                    "description": entry.get("summary", "")[:300],
+                    "source":      "Indeed",
+                })
+        except Exception as e:
+            print(f"❌ Indeed erreur '{kw}' : {e}")
+    print(f"✅ Indeed total → {len(jobs)} offre(s) pertinente(s)")
+    return jobs    
     
 # ── Email HTML ──────────────────────────────────────────────────
 def build_html(jobs):
@@ -144,4 +187,5 @@ if __name__ == "__main__":
     print(f"✅ Token obtenu : {token[:10]}...")
     jobs  = fetch_jobs(token)
     jobs += fetch_jobs_wttj()
+    jobs += fetch_jobs_indeed()     # ← ajouter cette ligne
     send_email(jobs)
