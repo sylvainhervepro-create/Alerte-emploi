@@ -35,11 +35,11 @@ def fetch_jobs(token):
     }
     # Recherches multiples pour couvrir votre profil
     searches = [
-        {"motsCles": "directeur général",         "typeContrat": "CDI"},
-        {"motsCles": "CEO",                        "typeContrat": "CDI"},
-        {"motsCles": "COO directeur opérations",   "typeContrat": "CDI"},
-        {"motsCles": "CFO directeur financier",    "typeContrat": "CDI"},
-        {"motsCles": "directeur marketing digital","typeContrat": "CDI"},
+        {"motsCles": "directeur général",          "typeContrat": "CDI"},
+        {"motsCles": "directeur de filiale",        "typeContrat": "CDI"},
+        {"motsCles": "directeur d activité",        "typeContrat": "CDI"},
+        {"motsCles": "directeur de site",           "typeContrat": "CDI"},
+        {"motsCles": "gérant dirigeant",            "typeContrat": "CDI"},
     ]
     today = datetime.now()
     common_params = {
@@ -68,8 +68,9 @@ def fetch_jobs(token):
             exclude_titles = ["infirmier", "infirmiere", "infirmière", "infirmièr",
                             "comptable", "assistant", "technicien", "commercial", 
                             "ingénieur", "développeur", "aide-soignant", "médecin"]
-            include_titles = ["directeur", "director", "ceo", "coo", "cfo", "daf",
-                            "général", "general", "président", "managing"]
+            include_titles = ["directeur", "director", "ceo", "coo", "cfo",
+                            "daf", "général", "general", "président", "managing",
+                            "gérant", "filiale", "activité", "site"]
             if not any(inc in title for inc in include_titles):
                 continue
             if any(ex in title for ex in exclude_titles):
